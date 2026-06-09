@@ -2,8 +2,8 @@ name: Daily Morning Scan Email
 
 on:
   schedule:
-    # 7:00 AM UTC — adjust to your timezone (e.g. 12:00 UTC = 7am EST, 14:00 UTC = 7am AEST)
-    - cron: '0 12 * * *'
+    # 9:00 AM Amsterdam time (CET=UTC+1 / CEST=UTC+2); using UTC+2 (summer)
+    - cron: '0 7 * * *'
   workflow_dispatch: # allow manual trigger
 
 jobs:
