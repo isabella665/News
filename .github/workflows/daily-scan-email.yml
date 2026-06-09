@@ -1,0 +1,88 @@
+name: Daily Morning Scan Email
+
+on:
+  schedule:
+    # 7:00 AM UTC — adjust to your timezone (e.g. 12:00 UTC = 7am EST, 14:00 UTC = 7am AEST)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  send-daily-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get today's date
+        id: date
+        run: |
+          echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          echo "week=$(date +%Y-W%V)" >> $GITHUB_OUTPUT
+
+      - name: Build email body
+        id: body
+        run: |
+          cat <<'EOF' > email_body.html
+          <html><body style="font-family:sans-serif;max-width:600px;margin:auto;color:#222;">
+          <h2 style="border-bottom:2px solid #333;padding-bottom:6px;">☀️ Daily AI News Scan — $TODAY</h2>
+
+          <p><strong>Time budget: ~10 minutes</strong></p>
+
+          <h3>Morning Checklist</h3>
+          <ul>
+            <li>☐ Check <strong>AI-News-Alerts</strong> inbox folder (Google Alerts)</li>
+            <li>☐ Skim overnight newsletters</li>
+            <li>☐ Flag anything with a comms angle → add to ideas bank</li>
+          </ul>
+
+          <h3>Google Alert Terms Active</h3>
+          <ul>
+            <li>AI governance</li>
+            <li>responsible AI regulation</li>
+            <li>AI safety legislation</li>
+            <li>AI public opinion</li>
+            <li>Anthropic</li>
+            <li>OpenAI</li>
+            <li>Google DeepMind</li>
+          </ul>
+
+          <h3>Flag an item if it has any of:</h3>
+          <ul>
+            <li>Relevance to AI governance, safety, or regulation</li>
+            <li>A named org angle (Anthropic, OpenAI, Google DeepMind, policymakers)</li>
+            <li>Potential reputational or narrative impact</li>
+            <li>Surprising public opinion data</li>
+          </ul>
+
+          <h3>Ideas Bank Entry Format</h3>
+          <pre style="background:#f4f4f4;padding:12px;border-radius:4px;font-size:13px;">
+          Headline:
+          Source:
+          Comms angle:
+          Format idea:  (thread / op-ed / reactive statement / explainer / pitch)
+          Priority:     High / Medium / Low
+          </pre>
+
+          <hr style="margin:24px 0;">
+          <p style="font-size:12px;color:#888;">
+            Automated by the News Workflow ·
+            <a href="https://github.com/isabella665/news">View repo</a>
+          </p>
+          </body></html>
+          EOF
+          # Substitute date
+          sed -i "s/\$TODAY/${{ steps.date.outputs.today }}/g" email_body.html
+          echo "body_file=email_body.html" >> $GITHUB_OUTPUT
+
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "☀️ Daily AI News Scan — ${{ steps.date.outputs.today }}"
+          to: ${{ secrets.RECIPIENT_EMAIL }}
+          from: "News Workflow <${{ secrets.MAIL_USERNAME }}>"
+          html_body: file://email_body.html
