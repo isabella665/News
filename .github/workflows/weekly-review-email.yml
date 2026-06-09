@@ -1,4 +1,4 @@
-name: Weekly Monday Review Email
+name: Weekly Monday Review
 
 on:
   schedule:
@@ -7,8 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  send-weekly-email:
+  create-weekly-issue:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,82 +20,38 @@ jobs:
         run: |
           echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
           echo "week=$(date +%Y-W%V)" >> $GITHUB_OUTPUT
-          echo "week_start=$(date -d 'last monday' +%Y-%m-%d 2>/dev/null || date -v-last-monday +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
-      - name: Collect flagged items from this week
-        id: flags
-        run: |
-          # Gather all ideas-bank entries from the past 7 days
-          FLAGS=""
-          for i in $(seq 0 6); do
-            DAY=$(date -d "-$i days" +%Y-%m-%d 2>/dev/null || date -v-${i}d +%Y-%m-%d)
-            FILE="ideas-bank/${DAY}-flags.md"
-            if [ -f "$FILE" ]; then
-              FLAGS="${FLAGS}<h4>${DAY}</h4>"
-              # Convert markdown to simple HTML (basic)
-              CONTENT=$(sed 's/### /<strong>/g;s/$/<\/strong>/;s/- \*\*/<li><em>/g;s/\*\*:/<\/em>:/g;s/<\/strong><\/strong>/<\/strong>/g' "$FILE" | tr '\n' ' ')
-              FLAGS="${FLAGS}<div style='background:#f9f9f9;padding:8px 12px;border-left:3px solid #555;margin-bottom:8px;'>${CONTENT}</div>"
-            fi
-          done
-          if [ -z "$FLAGS" ]; then
-            FLAGS="<p><em>No items flagged this week. Check the ideas bank folder and add entries manually if needed.</em></p>"
-          fi
-          # Save to file to avoid quoting issues
-          echo "$FLAGS" > flags_section.html
-
-      - name: Build email body
-        run: |
-          FLAGS_CONTENT=$(cat flags_section.html)
-          cat <<EOF > email_body.html
-          <html><body style="font-family:sans-serif;max-width:640px;margin:auto;color:#222;">
-          <h2 style="border-bottom:2px solid #333;padding-bottom:6px;">📋 Weekly AI News Review — ${{ steps.date.outputs.week }}</h2>
-          <p><strong>Monday check-in prep.</strong> Review the flagged items below and fill in the short list for today's team meeting.</p>
-
-          <h3>Flagged This Week</h3>
-          ${FLAGS_CONTENT}
-
-          <h3>Short List for Check-in</h3>
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-              <tr style="background:#333;color:#fff;">
-                <th style="padding:6px 8px;text-align:left;">#</th>
-                <th style="padding:6px 8px;text-align:left;">Story</th>
-                <th style="padding:6px 8px;text-align:left;">Comms Angle</th>
-                <th style="padding:6px 8px;text-align:left;">Format</th>
-                <th style="padding:6px 8px;text-align:left;">Voice</th>
-                <th style="padding:6px 8px;text-align:left;">Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style="background:#f4f4f4;"><td style="padding:6px 8px;">1</td><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr><td style="padding:6px 8px;">2</td><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr style="background:#f4f4f4;"><td style="padding:6px 8px;">3</td><td></td><td></td><td></td><td></td><td></td></tr>
-            </tbody>
-          </table>
-
-          <h3 style="margin-top:24px;">Format Options</h3>
-          <p style="font-size:13px;">Thread · Op-ed / byline · Reactive statement · Proactive press pitch · Explainer / FAQ · Social post · Internal briefing</p>
-
-          <h3>Voice Options</h3>
-          <p style="font-size:13px;">Executive (CEO/C-suite) · Company/institutional · Technical/product team · Policy/external affairs</p>
-
-          <hr style="margin:24px 0;">
-          <p style="font-size:12px;color:#888;">
-            Automated by the News Workflow ·
-            <a href="https://github.com/isabella665/news">View repo</a>
-          </p>
-          </body></html>
-          EOF
-
-      - name: Send email
-        uses: dawidd6/action-send-mail@v3
+      - name: Create weekly review issue
+        uses: actions/github-script@v7
         with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "📋 Weekly AI News Review — ${{ steps.date.outputs.week }}"
-          to: ${{ secrets.RECIPIENT_EMAIL }}
-          from: "News Workflow <${{ secrets.MAIL_USERNAME }}>"
-          html_body: file://email_body.html
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📋 Weekly AI News Review — ${{ steps.date.outputs.week }}`,
+              body: `**Monday check-in prep.** Review flagged items and fill in the short list for today's team meeting.
+
+## Short List for Check-in
+
+| # | Story | Comms Angle | Format | Voice | Priority |
+|---|-------|-------------|--------|-------|----------|
+| 1 | | | | | |
+| 2 | | | | | |
+| 3 | | | | | |
+
+## Themes This Week
+<!-- 2-3 sentences on the week's dominant narrative(s) -->
+
+## Items Carried Forward
+<!-- Flagged items from last week that still have legs -->
+
+## Decisions Needed
+<!-- What the team needs to greenlight or pass on -->
+
+---
+**Format options:** Thread · Op-ed · Reactive statement · Press pitch · Explainer · Social post · Internal briefing
+
+**Voice options:** Executive · Company/institutional · Technical/product · Policy/external affairs
+`,
+              labels: ['weekly-review']
+            });
