@@ -1,0 +1,43 @@
+name: Daily AI News Digest
+
+on:
+  schedule:
+    # 9:00 AM Amsterdam time (UTC+2 summer / UTC+1 winter)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run digest script
+        id: digest
+        run: |
+          python fetch_news.py > digest.md
+          echo "body<<ENDOFBODY" >> $GITHUB_OUTPUT
+          cat digest.md >> $GITHUB_OUTPUT
+          echo "ENDOFBODY" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().split('T')[0];
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📰 AI News Digest — ${today}`,
+              body: `${{ steps.digest.outputs.body }}`,
+              labels: ['digest']
+            });
