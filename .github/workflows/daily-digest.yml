@@ -2,8 +2,8 @@ name: Daily AI News Digest
 
 on:
   schedule:
-    # 9:00 AM Amsterdam time (UTC+2 summer / UTC+1 winter)
-    - cron: '0 7 * * *'
+    # 8:00 AM Amsterdam time (UTC+2 summer / UTC+1 winter)
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
